@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kalorije">
+<title>Kalorije</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --accent: #c8f060;
+    --accent2: #60d4f0;
+    --text: #f0ede6;
+    --muted: #888;
+    --danger: #f06060;
+    --warn: #f0c060;
+    --radius: 16px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overflow: hidden; }
+
+  /* LAYOUT */
+  #app { display: flex; flex-direction: column; height: 100%; padding-top: var(--safe-top); }
+  .view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .view.active { display: flex; }
+  .scroll-area { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: calc(80px + var(--safe-bottom)); }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  /* NAV */
+  nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(15,15,15,0.95); backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex; padding-bottom: var(--safe-bottom);
+    z-index: 100;
+  }
+  nav button {
+    flex: 1; background: none; border: none; color: var(--muted);
+    padding: 12px 8px 10px; font-family: 'DM Sans', sans-serif;
+    font-size: 10px; font-weight: 500; letter-spacing: 0.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    transition: color 0.2s; cursor: pointer; text-transform: uppercase;
+  }
+  nav button.active { color: var(--accent); }
+  nav button svg { width: 22px; height: 22px; }
+
+  /* HEADER */
+  .view-header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .view-header h1 { font-family: 'DM Serif Display', serif; font-size: 28px; font-weight: 400; }
+  .view-header p { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; margin-bottom: 10px;
+  }
+  .card-title { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+
+  /* MACRO BARS */
+  .macro-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .macro-box { background: var(--surface2); border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .macro-box .val { font-family: 'DM Serif Display', serif; font-size: 22px; }
+  .macro-box .lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+  .macro-box.kcal .val { color: var(--accent); }
+  .macro-box.prot .val { color: var(--accent2); }
+  .macro-box.carb .val { color: var(--warn); }
+  .macro-box.fat .val { color: #f09060; }
+
+  /* DATE NAV */
+  .date-nav { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .date-nav button { background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; padding: 4px 10px; }
+  .date-nav span { font-size: 15px; font-weight: 500; }
+
+  /* MEAL ITEM */
+  .meal-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .meal-item-left { flex: 1; min-width: 0; }
+  .meal-item-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meal-item-macros { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .meal-item-kcal { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--accent); margin-left: 12px; white-space: nowrap; }
+  .remove-btn { background: none; border: none; color: var(--danger); font-size: 20px; cursor: pointer; padding: 0 0 0 10px; line-height: 1; }
+
+  /* ADD BUTTON */
+  .fab {
+    position: fixed; bottom: calc(70px + var(--safe-bottom) + 16px); right: 16px;
+    width: 54px; height: 54px; border-radius: 50%;
+    background: var(--accent); color: #0f0f0f;
+    border: none; font-size: 28px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(200,240,96,0.4);
+    transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 99;
+  }
+  .fab:active { transform: scale(0.93); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    z-index: 200; align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border-top-left-radius: 24px; border-top-right-radius: 24px;
+    border: 1px solid var(--border); border-bottom: none;
+    width: 100%; max-height: 85vh; display: flex; flex-direction: column;
+    padding-bottom: var(--safe-bottom);
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 0; }
+  .modal-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h2 { font-family: 'DM Serif Display', serif; font-size: 22px; font-weight: 400; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 24px; cursor: pointer; }
+  .modal-scroll { flex: 1; overflow-y: auto; padding: 12px 16px; }
+  .modal-scroll::-webkit-scrollbar { display: none; }
+
+  /* SEARCH */
+  .search-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .search-box input {
+    background: none; border: none; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; flex: 1;
+  }
+  .search-box input::placeholder { color: var(--muted); }
+
+  /* LIST ITEMS */
+  .list-item {
+    padding: 13px 4px; border-bottom: 1px solid var(--border);
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+    transition: background 0.1s; border-radius: 8px;
+  }
+  .list-item:active { background: var(--surface2); }
+  .list-item-name { font-size: 15px; font-weight: 500; }
+  .list-item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .list-item-kcal { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--accent); }
+
+  /* TABS */
+  .tabs { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: none; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+  .tab.active { background: var(--accent); color: #0f0f0f; border-color: var(--accent); }
+
+  /* NAMIRNICE TABLE */
+  .namirnica-row {
+    padding: 12px 4px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .namirnica-info { flex: 1; }
+  .namirnica-name { font-size: 14px; font-weight: 500; }
+  .namirnica-macros { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .macro-badge { display: inline-block; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 600; margin-right: 4px; }
+  .mb-p { background: rgba(96,212,240,0.15); color: var(--accent2); }
+  .mb-u { background: rgba(240,192,96,0.15); color: var(--warn); }
+  .mb-m { background: rgba(240,144,96,0.15); color: #f09060; }
+  .mb-k { background: rgba(200,240,96,0.15); color: var(--accent); }
+
+  /* DNEVNI CILJ */
+  .goal-bar-wrap { margin-top: 10px; }
+  .goal-bar-label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .goal-bar-track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .goal-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .bar-k { background: var(--accent); }
+  .bar-p { background: var(--accent2); }
+  .bar-u { background: var(--warn); }
+  .bar-m { background: #f09060; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .empty .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty p { font-size: 14px; line-height: 1.5; }
+
+  /* SECTION LABEL */
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); padding: 14px 4px 6px; }
+
+  /* GOAL SETTINGS */
+  .settings-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .settings-row label { font-size: 14px; font-weight: 500; }
+  .settings-row span { font-size: 12px; color: var(--muted); }
+  .settings-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 12px;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; width: 100px; text-align: right;
+  }
+  .settings-input:focus { outline: none; border-color: var(--accent); }
+  .btn-primary {
+    width: 100%; padding: 14px; border-radius: 14px;
+    background: var(--accent); color: #0f0f0f;
+    border: none; font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+    margin-top: 16px; transition: opacity 0.2s;
+  }
+  .btn-primary:active { opacity: 0.8; }
+
+  /* FORM STYLES */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block; }
+  .form-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; outline: none; transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .form-row-4 .form-input { padding: 10px 8px; text-align: center; font-size: 14px; }
+  .macro-preview {
+    background: var(--surface2); border-radius: 12px; padding: 14px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-top: 8px; text-align: center;
+  }
+  .macro-preview .mp-val { font-family: 'DM Serif Display', serif; font-size: 18px; }
+  .macro-preview .mp-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-top: 2px; }
+  .btn-danger { background: rgba(240,96,96,0.15); color: var(--danger); border: 1px solid rgba(240,96,96,0.3); }
+  .custom-namirnica-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; margin: 4px; font-size: 13px; cursor: pointer;
+  }
+  .custom-namirnica-tag:active { opacity: 0.7; }
+  .tags-wrap { display: flex; flex-wrap: wrap; margin: 8px 0; }
+  .obrok-ingredijent {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .obrok-ingredijent-name { font-size: 14px; font-weight: 500; }
+  .obrok-ingredijent-sub { font-size: 12px; color: var(--muted); }
+  .obrok-ingredijent-remove { background: none; border: none; color: var(--danger); font-size: 20px; cursor: pointer; padding: 0 4px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; top: calc(var(--safe-top) + 16px); left: 50%; transform: translateX(-50%) translateY(-80px);
+    background: var(--surface); border: 1px solid var(--accent);
+    color: var(--accent); padding: 10px 20px; border-radius: 100px;
+    font-size: 13px; font-weight: 500; z-index: 500;
+    transition: transform 0.3s ease; white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- VIEW: DNEVNIK -->
+  <div class="view active" id="view-dnevnik">
+    <div class="view-header">
+      <h1>Dnevnik</h1>
+    </div>
+    <div class="date-nav">
+      <button onclick="changeDay(-1)">‹</button>
+      <span id="date-label"></span>
+      <button onclick="changeDay(1)">›</button>
+    </div>
+    <div class="scroll-area" id="dnevnik-scroll">
+      <!-- injected -->
+    </div>
+    <button class="fab" onclick="openAddModal()">+</button>
+  </div>
+
+  <!-- VIEW: OBROCI -->
+  <div class="view" id="view-obroci">
+    <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h1>Obroci</h1>
+        <p>Tapni obrok → dodaj u dnevnik</p>
+      </div>
+      <button onclick="openNoviObrokModal()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:12px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ Novi</button>
+    </div>
+    <div class="scroll-area" id="obroci-list"></div>
+  </div>
+
+  <!-- VIEW: NAMIRNICE -->
+  <div class="view" id="view-namirnice">
+    <div class="view-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h1>Namirnice</h1>
+        <p>Nutritivne vrednosti na 100g</p>
+      </div>
+      <button onclick="openNovaNamirnicaModal()" style="background:var(--accent);color:#0f0f0f;border:none;border-radius:12px;padding:8px 16px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;">+ Nova</button>
+    </div>
+    <div class="scroll-area" id="namirnice-list"></div>
+  </div>
+
+  <!-- VIEW: CILJEVI -->
+  <div class="view" id="view-ciljevi">
+    <div class="view-header">
+      <h1>Ciljevi</h1>
+      <p>Dnevni unos makronutrijenata</p>
+    </div>
+    <div class="scroll-area">
+      <div style="padding: 8px 0;">
+        <div class="settings-row">
+          <div><label>Kalorije</label><div><span>kcal/dan</span></div></div>
+          <input class="settings-input" type="number" id="goal-kcal" placeholder="2000">
+        </div>
+        <div class="settings-row">
+          <div><label>Proteini</label><div><span>g/dan</span></div></div>
+          <input class="settings-input" type="number" id="goal-p" placeholder="150">
+        </div>
+        <div class="settings-row">
+          <div><label>Ugljeni hidrati</label><div><span>g/dan</span></div></div>
+          <input class="settings-input" type="number" id="goal-uh" placeholder="200">
+        </div>
+        <div class="settings-row">
+          <div><label>Masti</label><div><span>g/dan</span></div></div>
+          <input class="settings-input" type="number" id="goal-m" placeholder="70">
+        </div>
+        <button class="btn-primary" onclick="saveGoals()">Sačuvaj ciljeve</button>
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <div class="card-title">Export podataka</div>
+          <button class="btn-primary" style="background: var(--surface2); color: var(--text); border: 1px solid var(--border); margin-top: 8px;" onclick="exportData()">📤 Eksportuj sve podatke</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <nav>
+    <button class="active" onclick="showView('dnevnik', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Dnevnik
+    </button>
+    <button onclick="showView('obroci', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+      Obroci
+    </button>
+    <button onclick="showView('namirnice', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 2a2 2 0 0 0-2 2v5H4a2 2 0 0 0-2 2v2c0 1.1.9 2 2 2h1v2a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-2h1a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-5V4a2 2 0 0 0-2-2h-2z"/></svg>
+      Namirnice
+    </button>
+    <button onclick="showView('ciljevi', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Ciljevi
+    </button>
+  </nav>
+</div>
+
+<!-- MODAL: DODAJ OBROK -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2>Dodaj u dnevnik</h2>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('saved', this)">Sačuvani obroci</button>
+      <button class="tab" onclick="switchTab('custom', this)">Po namirnicama</button>
+    </div>
+    <div class="modal-scroll" id="modal-content"></div>
+  </div>
+</div>
+
+<!-- MODAL: NOVA NAMIRNICA -->
+<div class="modal-overlay" id="nova-namirnica-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2>Nova namirnica</h2>
+      <button class="modal-close" onclick="closeNovaNamirnicaModal()">×</button>
+    </div>
+    <div class="modal-scroll" style="padding:16px;">
+      <div class="form-group">
+        <label class="form-label">Naziv namirnice</label>
+        <input class="form-input" type="text" id="nn-naziv" placeholder="npr. Tunjevina u vodi">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Vrednosti na 100g</label>
+        <div class="form-row-4">
+          <div>
+            <div style="font-size:11px;color:var(--accent2);text-align:center;margin-bottom:4px;">P (g)</div>
+            <input class="form-input" type="number" id="nn-p" placeholder="0" oninput="updateNNPreview()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--warn);text-align:center;margin-bottom:4px;">UH (g)</div>
+            <input class="form-input" type="number" id="nn-uh" placeholder="0" oninput="updateNNPreview()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:#f09060;text-align:center;margin-bottom:4px;">M (g)</div>
+            <input class="form-input" type="number" id="nn-m" placeholder="0" oninput="updateNNPreview()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--accent);text-align:center;margin-bottom:4px;">kcal</div>
+            <input class="form-input" type="number" id="nn-kcal" placeholder="auto" oninput="updateNNPreview()">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Pregled (na 100g)</label>
+        <div class="macro-preview" id="nn-preview">
+          <div><div class="mp-val" style="color:var(--accent2)">0</div><div class="mp-lbl">Proteini</div></div>
+          <div><div class="mp-val" style="color:var(--warn)">0</div><div class="mp-lbl">UH</div></div>
+          <div><div class="mp-val" style="color:#f09060">0</div><div class="mp-lbl">Masti</div></div>
+          <div><div class="mp-val" style="color:var(--accent)">0</div><div class="mp-lbl">kcal</div></div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveNovaNamirnica()">Sačuvaj namiricu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NOVI OBROK -->
+<div class="modal-overlay" id="novi-obrok-modal">
+  <div class="modal" style="max-height:92vh;">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h2>Novi obrok</h2>
+      <button class="modal-close" onclick="closeNoviObrokModal()">×</button>
+    </div>
+    <div class="modal-scroll" style="padding:16px;">
+      <div class="form-group">
+        <label class="form-label">Naziv obroka</label>
+        <input class="form-input" type="text" id="no-naziv" placeholder="npr. Obrok 25 – Tunjevina sa pirinčem">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dodaj namirnice</label>
+        <div class="search-box" style="margin-bottom:8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" class="form-input" style="border:none;background:none;padding:0;" placeholder="Pretraži namirnice..." id="no-search" oninput="renderNoSearch(this.value)">
+        </div>
+        <div id="no-search-results" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;"></div>
+      </div>
+      <div class="form-group" id="no-ingredijenti-wrap" style="display:none;">
+        <label class="form-label">Dodane namirnice</label>
+        <div id="no-ingredijenti-list"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Ukupne vrednosti obroka</label>
+        <div class="macro-preview" id="no-preview">
+          <div><div class="mp-val" style="color:var(--accent2)" id="no-prev-p">0</div><div class="mp-lbl">Proteini</div></div>
+          <div><div class="mp-val" style="color:var(--warn)" id="no-prev-uh">0</div><div class="mp-lbl">UH</div></div>
+          <div><div class="mp-val" style="color:#f09060" id="no-prev-m">0</div><div class="mp-lbl">Masti</div></div>
+          <div><div class="mp-val" style="color:var(--accent)" id="no-prev-kcal">0</div><div class="mp-lbl">kcal</div></div>
+        </div>
+      </div>
+      <div class="form-group" style="padding:2px 0 4px;border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
+        <label class="form-label" style="margin-bottom:8px;">Ili unesi makroe ručno</label>
+        <div class="form-row-4">
+          <div>
+            <div style="font-size:11px;color:var(--accent2);text-align:center;margin-bottom:4px;">P (g)</div>
+            <input class="form-input" type="number" id="no-manual-p" placeholder="0" oninput="updateNoManual()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--warn);text-align:center;margin-bottom:4px;">UH (g)</div>
+            <input class="form-input" type="number" id="no-manual-uh" placeholder="0" oninput="updateNoManual()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:#f09060;text-align:center;margin-bottom:4px;">M (g)</div>
+            <input class="form-input" type="number" id="no-manual-m" placeholder="0" oninput="updateNoManual()">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--accent);text-align:center;margin-bottom:4px;">kcal</div>
+            <input class="form-input" type="number" id="no-manual-kcal" placeholder="0" oninput="updateNoManual()">
+          </div>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveNoviObrok()">Sačuvaj obrok</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const NAMIRNICE = [
+  { naziv: "Ela sir 0%",         p: 13,   uh: 3,    m: 0.2,  kcal: 70  },
+  { naziv: "Pileća prsa",        p: 13,   uh: 0,    m: 1,    kcal: 70  },
+  { naziv: "Ovsene pahuljice",   p: 13,   uh: 68,   m: 7,    kcal: 389 },
+  { naziv: "Chia semenke",       p: 17,   uh: 42,   m: 31,   kcal: 486 },
+  { naziv: "Med",                p: 0.3,  uh: 82,   m: 0,    kcal: 304 },
+  { naziv: "Grčki jogurt",       p: 6,    uh: 4,    m: 1.5,  kcal: 70  },
+  { naziv: "Banana",             p: 1.1,  uh: 23,   m: 0.3,  kcal: 96  },
+  { naziv: "Maline",             p: 1.2,  uh: 12,   m: 0.7,  kcal: 52  },
+  { naziv: "Sojino mleko",       p: 3.8,  uh: 2,    m: 2,    kcal: 40  },
+  { naziv: "Beli hleb",          p: 9,    uh: 49,   m: 3.2,  kcal: 265 },
+  { naziv: "Kukuruz šećerac",    p: 3.4,  uh: 19,   m: 1.5,  kcal: 96  },
+  { naziv: "Zelena boranija",    p: 1.8,  uh: 7,    m: 0.1,  kcal: 31  },
+  { naziv: "Jabuka",             p: 0.3,  uh: 14,   m: 0.2,  kcal: 52  },
+  { naziv: "Narandža",           p: 0.9,  uh: 12,   m: 0.1,  kcal: 47  },
+  { naziv: "Protein whey",       p: 24,   uh: 3,    m: 1.5,  kcal: 120 },
+  { naziv: "Belo meso",          p: 22,   uh: 0,    m: 1,    kcal: 120 },
+  { naziv: "Junetina 90/10",     p: 22.6, uh: 0,    m: 10,   kcal: 200 },
+  { naziv: "Svinjetina 80/20",   p: 20,   uh: 0,    m: 20,   kcal: 280 },
+  { naziv: "Pirinač (sirov)",    p: 7,    uh: 78,   m: 0.6,  kcal: 365 },
+  { naziv: "Testenina (sirova)", p: 13,   uh: 75,   m: 1.5,  kcal: 371 },
+  { naziv: "Proteinska testenina",p:20,   uh: 50,   m: 5,    kcal: 330 },
+  { naziv: "Mladi sir",          p: 11,   uh: 3,    m: 4,    kcal: 98  },
+  { naziv: "Gauda sir",          p: 25,   uh: 2,    m: 27,   kcal: 356 },
+  { naziv: "Pastrmka",           p: 20,   uh: 0,    m: 6,    kcal: 148 },
+  { naziv: "Kobasica (domaća)",  p: 21,   uh: 2,    m: 35,   kcal: 400 },
+  { naziv: "Kečap",              p: 1,    uh: 25,   m: 0,    kcal: 112 },
+  { naziv: "Light majonez",      p: 1,    uh: 7,    m: 35,   kcal: 360 },
+  { naziv: "Senf",               p: 4,    uh: 6,    m: 4,    kcal: 66  },
+  { naziv: "Kafa sa mlekom",     p: 3,    uh: 5,    m: 2,    kcal: 50  },
+  { naziv: "Sok od paradajza",   p: 1,    uh: 4,    m: 0.2,  kcal: 17  },
+  { naziv: "Ulje",               p: 0,    uh: 0,    m: 100,  kcal: 884 },
+  { naziv: "Jaja",               p: 13,   uh: 1,    m: 11,   kcal: 155 },
+  { naziv: "Stisknuta šunka",    p: 11,   uh: 1,    m: 3,    kcal: 90  },
+  { naziv: "Integralne tortilje",p: 8,    uh: 45,   m: 7,    kcal: 280 },
+];
+
+const OBROCI = [
+  { id: 1,  naziv: "Obrok 1 – Ovsene sa jogurtom",      p: 51.5, uh: 55.4, m: 15.6, kcal: 569,  opis: "25g ovsene, 20g chia, 5g med, 150g grčki jogurt, 30g protein, 50g banana, 30g maline, 150ml sojino mleko" },
+  { id: 2,  naziv: "Obrok 2 – Ovsene sa Ela sirom",     p: 58.5, uh: 58.4, m: 14.3, kcal: 599,  opis: "25g ovsene, 20g chia, 5g med, 50g grčki jogurt, 100g ela sir, 30g protein, 50g banana, 30g maline, 150ml sojino mleko" },
+  { id: 16, naziv: "Obrok 16 – Proteinske palačinke",   p: 55.8, uh: 90.5, m: 24.3, kcal: 804,  opis: "75g ovsene, 150g jaja, 150g banana, 30g protein, 5g kakao" },
+  { id: 3,  naziv: "Obrok 3 – Mix 40/60 Pirinač",       p: 59.8, uh: 51.5, m: 41.1, kcal: 821,  opis: "150g svinjetina, 100g junetina, 50g pirinač, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 4,  naziv: "Obrok 4 – Mix 50/50 Pirinač",       p: 60.5, uh: 51.5, m: 38.6, kcal: 801,  opis: "125g svinjetina, 125g junetina, 50g pirinač, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 5,  naziv: "Obrok 5 – Mix 60/40 Pirinač",       p: 61.1, uh: 51.5, m: 36.1, kcal: 781,  opis: "100g svinjetina, 150g junetina, 50g pirinač, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 6,  naziv: "Obrok 6 – Mix 40/60 Testenina",     p: 62.8, uh: 50.0, m: 41.6, kcal: 824,  opis: "150g svinjetina, 100g junetina, 50g testenina, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 7,  naziv: "Obrok 7 – Mix 50/50 Testenina",     p: 63.5, uh: 50.0, m: 39.1, kcal: 804,  opis: "125g svinjetina, 125g junetina, 50g testenina, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 8,  naziv: "Obrok 8 – Mix 60/40 Testenina",     p: 64.1, uh: 50.0, m: 36.6, kcal: 784,  opis: "100g svinjetina, 150g junetina, 50g testenina, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 10, naziv: "Obrok 10 – Mix 50/50 Tortilja",     p: 56.5, uh: 31.5, m: 40.2, kcal: 715,  opis: "125g svinjetina, 125g junetina, 40g tortilja, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 13, naziv: "Obrok 13 – Belo meso Tortilja",     p: 61.3, uh: 31.0, m: 6.2,  kcal: 485,  opis: "250g belo meso, 40g tortilja, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 14, naziv: "Obrok 14 – Belo meso Prot. test.",  p: 66.1, uh: 33.2, m: 5.4,  kcal: 505,  opis: "250g belo meso, 40g prot. testenina, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 15, naziv: "Obrok 15 – Belo meso Pirinač",      p: 61.6, uh: 54.2, m: 3.7,  kcal: 555,  opis: "250g belo meso, 50g pirinač, 50g kukuruz, 25g boranija, 100ml paradajz sok" },
+  { id: 12, naziv: "Obrok 12 – Jastučići (MEGA)",       p: 193.4,uh:313.0, m: 50.6, kcal: 2496, opis: "400g belo brašno, 400g grčki jogurt, 300g ela sir, 400g junetina" },
+  { id: 17, naziv: "Obrok 17 – Jaja + mladi sir",       p: 56.5, uh: 13.7, m: 43.8, kcal: 682,  opis: "300g jaja, 150g mladi sir, 4ml ulje, 20g kečap, 20g senf" },
+  { id: 18, naziv: "Obrok 18 – Jaja + gauda",           p: 47.5, uh: 9.8,  m: 45.9, kcal: 642,  opis: "300g jaja, 30g gauda sir, 4ml ulje, 20g kečap, 20g senf" },
+  { id: 19, naziv: "Obrok 19 – Jaja + pile + mladi sir",p: 69.5, uh: 13.7, m: 44.8, kcal: 752,  opis: "300g jaja, 100g pileća prsa, 150g mladi sir, 4ml ulje, 20g kečap, 20g senf" },
+  { id: 20, naziv: "Obrok 20 – Jaja basic",             p: 40.0, uh: 9.2,  m: 37.8, kcal: 535,  opis: "300g jaja, 4ml ulje, 20g kečap, 20g senf" },
+  { id: 21, naziv: "Obrok 21 – Hleb + ela + pile",      p: 42.5, uh: 53.5, m: 5.7,  kcal: 426,  opis: "100g beli hleb, 100g ela sir, 150g pileća prsa" },
+  { id: 22, naziv: "Obrok 22 – Hleb + mladi sir + pile",p: 49.5, uh: 54.5, m: 11.5, kcal: 520,  opis: "100g beli hleb, 150g mladi sir, 150g pileća prsa" },
+  { id: 23, naziv: "Obrok 23 – Hleb + ela + mladi + pile",p:56.0,uh: 56.0, m: 10.2, kcal: 540,  opis: "100g beli hleb, 100g ela sir, 100g mladi sir, 150g pileća prsa" },
+  { id: 24, naziv: "Obrok 24 – Jaja + ela + hleb",      p: 49.2, uh: 61.6, m: 33.2, kcal: 753,  opis: "200g jaja, 100g ela sir, 20g kečap, 20g light majonez, 20g senf, 100g beli hleb" },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let currentDate = todayStr();
+let activeTab = 'saved';
+let modalSearchQ = '';
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function dateLabel(s) {
+  const d = new Date(s + 'T12:00:00');
+  const days = ['Ned','Pon','Uto','Sre','Čet','Pet','Sub'];
+  const months = ['jan','feb','mar','apr','maj','jun','jul','avg','sep','okt','nov','dec'];
+  const day = days[d.getDay()];
+  if (s === todayStr()) return `Danas, ${d.getDate()}. ${months[d.getMonth()]}`;
+  return `${day}, ${d.getDate()}. ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// ============================================================
+// STORAGE
+// ============================================================
+function getDnevnik() {
+  try { return JSON.parse(localStorage.getItem('dnevnik') || '{}'); } catch { return {}; }
+}
+function saveDnevnik(d) { localStorage.setItem('dnevnik', JSON.stringify(d)); }
+function getDayEntries() {
+  return getDnevnik()[currentDate] || [];
+}
+function addEntry(entry) {
+  const d = getDnevnik();
+  if (!d[currentDate]) d[currentDate] = [];
+  d[currentDate].push({ ...entry, uid: Date.now() });
+  saveDnevnik(d);
+}
+function removeEntry(uid) {
+  const d = getDnevnik();
+  if (!d[currentDate]) return;
+  d[currentDate] = d[currentDate].filter(e => e.uid !== uid);
+  saveDnevnik(d);
+}
+function getGoals() {
+  try { return JSON.parse(localStorage.getItem('goals') || '{"kcal":2000,"p":150,"uh":200,"m":70}'); } catch { return {kcal:2000,p:150,uh:200,m:70}; }
+}
+function saveGoalsData(g) { localStorage.setItem('goals', JSON.stringify(g)); }
+
+// Custom namirnice (user-added)
+function getCustomNamirnice() {
+  try { return JSON.parse(localStorage.getItem('custom_namirnice') || '[]'); } catch { return []; }
+}
+function saveCustomNamirnice(arr) { localStorage.setItem('custom_namirnice', JSON.stringify(arr)); }
+function getAllNamirnice() { return [...NAMIRNICE, ...getCustomNamirnice()]; }
+
+// Custom obroci (user-added)
+function getCustomObroci() {
+  try { return JSON.parse(localStorage.getItem('custom_obroci') || '[]'); } catch { return []; }
+}
+function saveCustomObroci(arr) { localStorage.setItem('custom_obroci', JSON.stringify(arr)); }
+function getAllObroci() { return [...OBROCI, ...getCustomObroci()]; }
+
+// ============================================================
+// VIEWS
+// ============================================================
+function showView(name, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'dnevnik') renderDnevnik();
+  if (name === 'obroci') renderObroci();
+  if (name === 'namirnice') renderNamirnice();
+  if (name === 'ciljevi') loadGoals();
+}
+
+// ============================================================
+// DNEVNIK
+// ============================================================
+function changeDay(d) {
+  const dt = new Date(currentDate + 'T12:00:00');
+  dt.setDate(dt.getDate() + d);
+  currentDate = dt.toISOString().slice(0, 10);
+  renderDnevnik();
+}
+
+function renderDnevnik() {
+  document.getElementById('date-label').textContent = dateLabel(currentDate);
+  const entries = getDayEntries();
+  const goals = getGoals();
+  const totals = entries.reduce((acc, e) => {
+    acc.kcal += e.kcal || 0; acc.p += e.p || 0;
+    acc.uh += e.uh || 0; acc.m += e.m || 0;
+    return acc;
+  }, {kcal:0,p:0,uh:0,m:0});
+
+  let html = '';
+
+  // Summary card
+  html += `<div class="card" style="margin-bottom:14px;">
+    <div class="macro-grid">
+      <div class="macro-box kcal"><div class="val">${Math.round(totals.kcal)}</div><div class="lbl">kcal</div></div>
+      <div class="macro-box prot"><div class="val">${totals.p.toFixed(1)}</div><div class="lbl">P</div></div>
+      <div class="macro-box carb"><div class="val">${totals.uh.toFixed(1)}</div><div class="lbl">UH</div></div>
+      <div class="macro-box fat"><div class="val">${totals.m.toFixed(1)}</div><div class="lbl">M</div></div>
+    </div>`;
+
+  // Progress bars
+  const pct = (v, g) => Math.min(100, g > 0 ? (v/g*100) : 0);
+  html += `
+    <div class="goal-bar-wrap">
+      <div class="goal-bar-label"><span>Kalorije</span><span>${Math.round(totals.kcal)} / ${goals.kcal} kcal</span></div>
+      <div class="goal-bar-track"><div class="goal-bar-fill bar-k" style="width:${pct(totals.kcal,goals.kcal)}%"></div></div>
+    </div>
+    <div class="goal-bar-wrap" style="margin-top:8px;">
+      <div class="goal-bar-label"><span>Proteini</span><span>${totals.p.toFixed(1)} / ${goals.p}g</span></div>
+      <div class="goal-bar-track"><div class="goal-bar-fill bar-p" style="width:${pct(totals.p,goals.p)}%"></div></div>
+    </div>
+    <div class="goal-bar-wrap" style="margin-top:8px;">
+      <div class="goal-bar-label"><span>Ugljeni hidrati</span><span>${totals.uh.toFixed(1)} / ${goals.uh}g</span></div>
+      <div class="goal-bar-track"><div class="goal-bar-fill bar-u" style="width:${pct(totals.uh,goals.uh)}%"></div></div>
+    </div>
+    <div class="goal-bar-wrap" style="margin-top:8px;">
+      <div class="goal-bar-label"><span>Masti</span><span>${totals.m.toFixed(1)} / ${goals.m}g</span></div>
+      <div class="goal-bar-track"><div class="goal-bar-fill bar-m" style="width:${pct(totals.m,goals.m)}%"></div></div>
+    </div>
+  </div>`;
+
+  html += '</div>';
+
+  if (entries.length === 0) {
+    html += `<div class="empty"><div class="icon">🥗</div><p>Nema unetih obroka za ovaj dan.<br>Pritisnite + da dodate obrok.</p></div>`;
+  } else {
+    html += `<div class="section-label">Uneseni obroci (${entries.length})</div>`;
+    entries.forEach(e => {
+      html += `<div class="meal-item">
+        <div class="meal-item-left">
+          <div class="meal-item-name">${e.naziv}</div>
+          <div class="meal-item-macros">P: ${e.p}g &nbsp;·&nbsp; UH: ${e.uh}g &nbsp;·&nbsp; M: ${e.m}g</div>
+        </div>
+        <div class="meal-item-kcal">${Math.round(e.kcal)}</div>
+        <button class="remove-btn" onclick="removeFromDay(${e.uid})">×</button>
+      </div>`;
+    });
+  }
+
+  document.getElementById('dnevnik-scroll').innerHTML = html;
+}
+
+function removeFromDay(uid) {
+  removeEntry(uid);
+  renderDnevnik();
+}
+
+// ============================================================
+// ADD MODAL
+// ============================================================
+function openAddModal() {
+  document.getElementById('add-modal').classList.add('open');
+  activeTab = 'saved';
+  modalSearchQ = '';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===0));
+  renderModalContent();
+}
+function closeAddModal() {
+  document.getElementById('add-modal').classList.remove('open');
+}
+document.getElementById('add-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAddModal();
+});
+
+function switchTab(tab, btn) {
+  activeTab = tab;
+  modalSearchQ = '';
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  renderModalContent();
+}
+
+function renderModalContent() {
+  const el = document.getElementById('modal-content');
+  let html = `<div class="search-box">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input type="text" placeholder="Pretraži..." id="modal-search" value="${modalSearchQ}" oninput="onModalSearch(this.value)">
+  </div>`;
+
+  const q = modalSearchQ.toLowerCase();
+
+  if (activeTab === 'saved') {
+    const filtered = getAllObroci().filter(o => o.naziv.toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      html += `<div class="empty" style="padding:32px"><p>Nema rezultata</p></div>`;
+    } else {
+      filtered.forEach(o => {
+        html += `<div class="list-item" onclick="addSavedMeal(${o.id})">
+          <div>
+            <div class="list-item-name">${o.naziv}</div>
+            <div class="list-item-sub">P:${o.p}g · UH:${o.uh}g · M:${o.m}g</div>
+          </div>
+          <div class="list-item-kcal">${o.kcal}</div>
+        </div>`;
+      });
+    }
+  } else {
+    const allN = getAllNamirnice();
+    const filtered = allN.filter(n => n.naziv.toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      html += `<div class="empty" style="padding:32px"><p>Nema rezultata</p></div>`;
+    } else {
+      filtered.forEach((n, i) => {
+        const realIdx = allN.indexOf(n);
+        html += `<div class="list-item" onclick="openCustomAmount(${realIdx})">
+          <div>
+            <div class="list-item-name">${n.naziv}</div>
+            <div class="list-item-sub">P:${n.p}g · UH:${n.uh}g · M:${n.m}g &nbsp;(na 100g)</div>
+          </div>
+          <div class="list-item-kcal">${n.kcal}</div>
+        </div>`;
+      });
+    }
+  }
+
+  el.innerHTML = html;
+  const si = document.getElementById('modal-search');
+  if (si) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+}
+
+function onModalSearch(v) {
+  modalSearchQ = v;
+  renderModalContent();
+}
+
+function addSavedMeal(id) {
+  const o = getAllObroci().find(x => x.id === id);
+  if (!o) return;
+  addEntry({ naziv: o.naziv, p: o.p, uh: o.uh, m: o.m, kcal: o.kcal });
+  closeAddModal();
+  renderDnevnik();
+  showToast(`✓ ${o.naziv.split('–')[1]?.trim() || o.naziv} dodat`);
+}
+
+let customNamirnicaIdx = -1;
+function openCustomAmount(idx) {
+  const allN = getAllNamirnice();
+  const n = allN[idx];
+  if (!n) return;
+  const amount = prompt(`Koliko grama ${n.naziv}?`, '100');
+  if (!amount || isNaN(parseFloat(amount))) return;
+  const g = parseFloat(amount);
+  const mul = g / 100;
+  addEntry({
+    naziv: `${n.naziv} (${g}g)`,
+    p: +(n.p * mul).toFixed(1), uh: +(n.uh * mul).toFixed(1),
+    m: +(n.m * mul).toFixed(1), kcal: +(n.kcal * mul).toFixed(1)
+  });
+  closeAddModal();
+  renderDnevnik();
+  showToast(`✓ ${n.naziv} (${g}g) dodat`);
+}
+
+// ============================================================
+// OBROCI VIEW
+// ============================================================
+function renderObroci() {
+  const allO = getAllObroci();
+  const customO = getCustomObroci();
+  let html = '';
+
+  const groups = [
+    { label: 'Doručak / Slatki obroci', ids: [1,2,16] },
+    { label: 'Mix meso (Svinjina + Junetina)', ids: [3,4,5,6,7,8,10] },
+    { label: 'Belo meso (Pileća prsa)', ids: [13,14,15] },
+    { label: 'Jaja obroci', ids: [17,18,19,20] },
+    { label: 'Hleb obroci', ids: [21,22,23,24] },
+    { label: 'Specijalni obroci', ids: [12] },
+  ];
+
+  groups.forEach(g => {
+    const obroci = g.ids.map(id => OBROCI.find(o => o.id === id)).filter(Boolean);
+    html += `<div class="section-label">${g.label}</div>`;
+    obroci.forEach(o => { html += obrokCard(o, false); });
+  });
+
+  if (customO.length > 0) {
+    html += `<div class="section-label">Moji obroci</div>`;
+    customO.forEach(o => { html += obrokCard(o, true); });
+  }
+
+  document.getElementById('obroci-list').innerHTML = html;
+}
+
+function obrokCard(o, isDeletable) {
+  return `<div class="list-item" onclick="addSavedMealDirect(${o.id})" style="flex-direction:column;align-items:flex-start;padding:14px 8px;">
+    <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+      <div class="list-item-name" style="flex:1;padding-right:8px;">${o.naziv}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="list-item-kcal">${o.kcal} <span style="font-size:12px;color:var(--muted);font-family:'DM Sans',sans-serif;">kcal</span></div>
+        ${isDeletable ? `<button onclick="event.stopPropagation();deleteCustomObrok(${o.id})" style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;padding:0 2px;">🗑</button>` : ''}
+      </div>
+    </div>
+    <div style="margin-top:6px;">
+      <span class="macro-badge mb-p">P: ${o.p}g</span>
+      <span class="macro-badge mb-u">UH: ${o.uh}g</span>
+      <span class="macro-badge mb-m">M: ${o.m}g</span>
+    </div>
+    ${o.opis ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4;">${o.opis}</div>` : ''}
+  </div>`;
+}
+
+function deleteCustomObrok(id) {
+  if (!confirm('Obrisati ovaj obrok?')) return;
+  const arr = getCustomObroci().filter(o => o.id !== id);
+  saveCustomObroci(arr);
+  renderObroci();
+  showToast('🗑 Obrok obrisan');
+}
+
+function addSavedMealDirect(id) {
+  const o = getAllObroci().find(x => x.id === id);
+  if (!o) return;
+  addEntry({ naziv: o.naziv, p: o.p, uh: o.uh, m: o.m, kcal: o.kcal });
+  showView('dnevnik', document.querySelector('nav button'));
+  renderDnevnik();
+  showToast(`✓ Dodat u dnevnik`);
+}
+
+// ============================================================
+// NAMIRNICE VIEW
+// ============================================================
+function renderNamirnice() {
+  const customN = getCustomNamirnice();
+  let html = '';
+
+  if (customN.length > 0) {
+    html += `<div class="section-label">Moje namirnice</div>`;
+    customN.forEach((n, i) => {
+      html += namirnicaRow(n, true, i);
+    });
+    html += `<div class="section-label">Ugrađene namirnice</div>`;
+  }
+
+  NAMIRNICE.forEach(n => { html += namirnicaRow(n, false, -1); });
+  document.getElementById('namirnice-list').innerHTML = html;
+}
+
+function namirnicaRow(n, isDeletable, customIdx) {
+  return `<div class="namirnica-row">
+    <div class="namirnica-info">
+      <div class="namirnica-name">${n.naziv}</div>
+      <div style="margin-top:5px;">
+        <span class="macro-badge mb-p">P: ${n.p}g</span>
+        <span class="macro-badge mb-u">UH: ${n.uh}g</span>
+        <span class="macro-badge mb-m">M: ${n.m}g</span>
+        <span class="macro-badge mb-k">⚡ ${n.kcal}</span>
+      </div>
+    </div>
+    ${isDeletable ? `<button onclick="deleteCustomNamirnica(${customIdx})" style="background:none;border:none;color:var(--danger);font-size:18px;cursor:pointer;padding:4px 8px;margin-left:8px;">🗑</button>` : ''}
+  </div>`;
+}
+
+function deleteCustomNamirnica(idx) {
+  if (!confirm('Obrisati ovu namirnicu?')) return;
+  const arr = getCustomNamirnice();
+  arr.splice(idx, 1);
+  saveCustomNamirnice(arr);
+  renderNamirnice();
+  showToast('🗑 Namirnica obrisana');
+}
+
+// ============================================================
+// NOVA NAMIRNICA MODAL
+// ============================================================
+function openNovaNamirnicaModal() {
+  document.getElementById('nova-namirnica-modal').classList.add('open');
+  document.getElementById('nn-naziv').value = '';
+  document.getElementById('nn-p').value = '';
+  document.getElementById('nn-uh').value = '';
+  document.getElementById('nn-m').value = '';
+  document.getElementById('nn-kcal').value = '';
+  updateNNPreview();
+}
+function closeNovaNamirnicaModal() {
+  document.getElementById('nova-namirnica-modal').classList.remove('open');
+}
+document.getElementById('nova-namirnica-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeNovaNamirnicaModal();
+});
+
+function updateNNPreview() {
+  const p = parseFloat(document.getElementById('nn-p').value) || 0;
+  const uh = parseFloat(document.getElementById('nn-uh').value) || 0;
+  const m = parseFloat(document.getElementById('nn-m').value) || 0;
+  const kcalInput = parseFloat(document.getElementById('nn-kcal').value);
+  const kcal = isNaN(kcalInput) ? Math.round(p * 4 + uh * 4 + m * 9) : kcalInput;
+  const prev = document.getElementById('nn-preview');
+  prev.children[0].children[0].textContent = p;
+  prev.children[1].children[0].textContent = uh;
+  prev.children[2].children[0].textContent = m;
+  prev.children[3].children[0].textContent = kcal;
+}
+
+function saveNovaNamirnica() {
+  const naziv = document.getElementById('nn-naziv').value.trim();
+  if (!naziv) { showToast('⚠ Unesite naziv!'); return; }
+  const p = parseFloat(document.getElementById('nn-p').value) || 0;
+  const uh = parseFloat(document.getElementById('nn-uh').value) || 0;
+  const m = parseFloat(document.getElementById('nn-m').value) || 0;
+  const kcalInput = parseFloat(document.getElementById('nn-kcal').value);
+  const kcal = isNaN(kcalInput) ? Math.round(p * 4 + uh * 4 + m * 9) : kcalInput;
+  const arr = getCustomNamirnice();
+  arr.push({ naziv, p, uh, m, kcal });
+  saveCustomNamirnice(arr);
+  closeNovaNamirnicaModal();
+  renderNamirnice();
+  showToast(`✓ ${naziv} sačuvana`);
+}
+
+// ============================================================
+// NOVI OBROK MODAL
+// ============================================================
+let noIngredienti = []; // { naziv, g, p, uh, m, kcal }
+let noManualMode = false;
+
+function openNoviObrokModal() {
+  noIngredienti = [];
+  noManualMode = false;
+  document.getElementById('novi-obrok-modal').classList.add('open');
+  document.getElementById('no-naziv').value = '';
+  document.getElementById('no-search').value = '';
+  document.getElementById('no-manual-p').value = '';
+  document.getElementById('no-manual-uh').value = '';
+  document.getElementById('no-manual-m').value = '';
+  document.getElementById('no-manual-kcal').value = '';
+  renderNoSearch('');
+  renderNoIngredienti();
+  updateNoPreview();
+}
+function closeNoviObrokModal() {
+  document.getElementById('novi-obrok-modal').classList.remove('open');
+}
+document.getElementById('novi-obrok-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeNoviObrokModal();
+});
+
+function renderNoSearch(q) {
+  const el = document.getElementById('no-search-results');
+  const allN = getAllNamirnice();
+  const filtered = q.length > 0 ? allN.filter(n => n.naziv.toLowerCase().includes(q.toLowerCase())) : allN.slice(0, 12);
+  let html = '';
+  filtered.forEach((n, i) => {
+    const realIdx = allN.indexOf(n);
+    html += `<div class="list-item" onclick="noAddNamirnica(${realIdx})" style="padding:10px 12px;">
+      <div>
+        <div class="list-item-name" style="font-size:14px;">${n.naziv}</div>
+        <div class="list-item-sub">${n.p}P · ${n.uh}UH · ${n.m}M · ${n.kcal}kcal / 100g</div>
+      </div>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </div>`;
+  });
+  el.innerHTML = html || `<div style="padding:16px;text-align:center;color:var(--muted);font-size:13px;">Nema rezultata</div>`;
+}
+
+function noAddNamirnica(idx) {
+  const allN = getAllNamirnice();
+  const n = allN[idx];
+  if (!n) return;
+  const gStr = prompt(`Koliko grama ${n.naziv}?`, '100');
+  if (!gStr || isNaN(parseFloat(gStr))) return;
+  const g = parseFloat(gStr);
+  const mul = g / 100;
+  noIngredienti.push({
+    naziv: n.naziv, g,
+    p: +(n.p * mul).toFixed(1),
+    uh: +(n.uh * mul).toFixed(1),
+    m: +(n.m * mul).toFixed(1),
+    kcal: +(n.kcal * mul).toFixed(1)
+  });
+  renderNoIngredienti();
+  updateNoPreview();
+  document.getElementById('no-search').value = '';
+  renderNoSearch('');
+}
+
+function noRemoveIngredijenat(idx) {
+  noIngredienti.splice(idx, 1);
+  renderNoIngredienti();
+  updateNoPreview();
+}
+
+function renderNoIngredienti() {
+  const wrap = document.getElementById('no-ingredijenti-wrap');
+  const list = document.getElementById('no-ingredijenti-list');
+  if (noIngredienti.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = noIngredienti.map((ing, i) => `
+    <div class="obrok-ingredijent">
+      <div>
+        <div class="obrok-ingredijent-name">${ing.naziv} (${ing.g}g)</div>
+        <div class="obrok-ingredijent-sub">P:${ing.p}g · UH:${ing.uh}g · M:${ing.m}g · ${ing.kcal}kcal</div>
+      </div>
+      <button class="obrok-ingredijent-remove" onclick="noRemoveIngredijenat(${i})">×</button>
+    </div>`).join('');
+}
+
+function updateNoPreview() {
+  const totals = noIngredienti.reduce((acc, ing) => {
+    acc.p += ing.p; acc.uh += ing.uh; acc.m += ing.m; acc.kcal += ing.kcal; return acc;
+  }, {p:0, uh:0, m:0, kcal:0});
+  document.getElementById('no-prev-p').textContent = totals.p.toFixed(1);
+  document.getElementById('no-prev-uh').textContent = totals.uh.toFixed(1);
+  document.getElementById('no-prev-m').textContent = totals.m.toFixed(1);
+  document.getElementById('no-prev-kcal').textContent = Math.round(totals.kcal);
+}
+
+function updateNoManual() {
+  const p = parseFloat(document.getElementById('no-manual-p').value) || 0;
+  const uh = parseFloat(document.getElementById('no-manual-uh').value) || 0;
+  const m = parseFloat(document.getElementById('no-manual-m').value) || 0;
+  const kcal = parseFloat(document.getElementById('no-manual-kcal').value) || 0;
+  document.getElementById('no-prev-p').textContent = p.toFixed(1);
+  document.getElementById('no-prev-uh').textContent = uh.toFixed(1);
+  document.getElementById('no-prev-m').textContent = m.toFixed(1);
+  document.getElementById('no-prev-kcal').textContent = Math.round(kcal);
+}
+
+function saveNoviObrok() {
+  const naziv = document.getElementById('no-naziv').value.trim();
+  if (!naziv) { showToast('⚠ Unesite naziv obroka!'); return; }
+
+  let p, uh, m, kcal, opis = '';
+
+  const manualP = parseFloat(document.getElementById('no-manual-p').value);
+  const hasManual = !isNaN(manualP) && document.getElementById('no-manual-p').value !== '';
+
+  if (noIngredienti.length > 0 && !hasManual) {
+    const totals = noIngredienti.reduce((acc, ing) => {
+      acc.p += ing.p; acc.uh += ing.uh; acc.m += ing.m; acc.kcal += ing.kcal; return acc;
+    }, {p:0, uh:0, m:0, kcal:0});
+    p = +totals.p.toFixed(1); uh = +totals.uh.toFixed(1);
+    m = +totals.m.toFixed(1); kcal = +totals.kcal.toFixed(1);
+    opis = noIngredienti.map(i => `${i.g}g ${i.naziv}`).join(', ');
+  } else if (hasManual) {
+    p = parseFloat(document.getElementById('no-manual-p').value) || 0;
+    uh = parseFloat(document.getElementById('no-manual-uh').value) || 0;
+    m = parseFloat(document.getElementById('no-manual-m').value) || 0;
+    kcal = parseFloat(document.getElementById('no-manual-kcal').value) || Math.round(p*4+uh*4+m*9);
+  } else {
+    showToast('⚠ Dodajte namirnice ili unesite makroe!'); return;
+  }
+
+  const customO = getCustomObroci();
+  const newId = Date.now();
+  customO.push({ id: newId, naziv, p, uh, m, kcal, opis });
+  saveCustomObroci(customO);
+  closeNoviObrokModal();
+  renderObroci();
+  showToast(`✓ ${naziv} sačuvan`);
+}
+
+// ============================================================
+// GOALS
+// ============================================================
+function loadGoals() {
+  const g = getGoals();
+  document.getElementById('goal-kcal').value = g.kcal;
+  document.getElementById('goal-p').value = g.p;
+  document.getElementById('goal-uh').value = g.uh;
+  document.getElementById('goal-m').value = g.m;
+}
+function saveGoals() {
+  const g = {
+    kcal: parseFloat(document.getElementById('goal-kcal').value) || 2000,
+    p: parseFloat(document.getElementById('goal-p').value) || 150,
+    uh: parseFloat(document.getElementById('goal-uh').value) || 200,
+    m: parseFloat(document.getElementById('goal-m').value) || 70,
+  };
+  saveGoalsData(g);
+  showToast('✓ Ciljevi sačuvani');
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportData() {
+  const data = { dnevnik: getDnevnik(), goals: getGoals(), exported: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kalorije-backup.json';
+  a.click();
+  showToast('📤 Eksport uspešan');
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderDnevnik();
+</script>
+</body>
+</html>
